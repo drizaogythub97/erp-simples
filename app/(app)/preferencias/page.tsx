@@ -3,6 +3,7 @@ import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
 
 import { BrandSection } from "./sections/brand-section";
 import { FeesSection } from "./sections/fees-section";
+import { LogoSection } from "./sections/logo-section";
 import { ThemeSection } from "./sections/theme-section";
 
 export const metadata = {
@@ -42,6 +43,11 @@ export default async function PreferencesPage() {
     theme: "light",
   }) as ProfileRow;
   const feesData = (fees ?? DEFAULT_FEES) as PaymentFees;
+  const initialLogoUrl = profileData.brand_logo_path
+    ? supabase.storage
+        .from("brand-logos")
+        .getPublicUrl(profileData.brand_logo_path).data.publicUrl
+    : null;
 
   return (
     <section className="flex flex-col gap-8">
@@ -55,6 +61,7 @@ export default async function PreferencesPage() {
 
       <ThemeSection currentTheme={profileData.theme} />
       <BrandSection initialName={profileData.brand_name ?? ""} />
+      <LogoSection initialLogoUrl={initialLogoUrl} />
       <FeesSection initialFees={feesData} />
     </section>
   );

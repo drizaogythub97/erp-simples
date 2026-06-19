@@ -8,6 +8,40 @@ import { parseDecimalPtBR } from "@/lib/products/format";
 import { THEME_COOKIE, type Theme } from "@/lib/theme/cookie";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
+const MAX_LOGO_BYTES = 1_500_000; // ~1,5 MB depois de cropado/reencoded
+
+type AcceptedKind = "webp" | "png" | "jpeg";
+
+function detectImageKind(bytes: Uint8Array): AcceptedKind | null {
+  if (bytes.length < 12) return null;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "png";
+  }
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "jpeg";
+  }
+  // WebP: RIFF .... WEBP
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "webp";
+  }
+  return null;
+}
 
 export type FeesFormState = {
   ok?: boolean;
@@ -78,6 +112,108 @@ export async function saveBrandName(
 
   if (error) return { error: "Não foi possível salvar." };
   revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export type LogoUploadResult = { ok: boolean; error?: string; path?: string };
+
+export async function uploadBrandLogo(
+  formData: FormData,
+): Promise<LogoUploadResult> {
+  const file = formData.get("logo");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Arquivo não enviado." };
+  }
+  if (file.size === 0) {
+    return { ok: false, error: "Arquivo vazio." };
+  }
+  if (file.size > MAX_LOGO_BYTES) {
+    return { ok: false, error: "Imagem maior que 1,5 MB." };
+  }
+  // Aceita só MIME esperado (declarado pelo browser). Re-checamos magic bytes abaixo.
+  if (!["image/webp", "image/png", "image/jpeg"].includes(file.type)) {
+    return { ok: false, error: "Use uma imagem PNG, JPEG ou WebP." };
+  }
+
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  const kind = detectImageKind(buffer);
+  if (!kind) {
+    return {
+      ok: false,
+      error: "Arquivo não é uma imagem válida (PNG / JPEG / WebP).",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const ext = kind === "jpeg" ? "jpg" : kind;
+  const key = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("brand-logos")
+    .upload(key, buffer, {
+      contentType: `image/${kind}`,
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    return { ok: false, error: "Não foi possível enviar a imagem." };
+  }
+
+  const { data: previousProfile } = await supabase
+    .from("profiles")
+    .select("brand_logo_path")
+    .eq("id", user.id)
+    .maybeSingle();
+  const previousPath = previousProfile?.brand_logo_path as string | null;
+
+  const { error: updError } = await supabase
+    .from("profiles")
+    .update({ brand_logo_path: key })
+    .eq("id", user.id);
+
+  if (updError) {
+    await supabase.storage.from("brand-logos").remove([key]);
+    return { ok: false, error: "Não foi possível salvar a referência." };
+  }
+
+  if (previousPath && previousPath !== key) {
+    await supabase.storage.from("brand-logos").remove([previousPath]);
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/preferencias");
+  return { ok: true, path: key };
+}
+
+export async function removeBrandLogo(): Promise<LogoUploadResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("brand_logo_path")
+    .eq("id", user.id)
+    .maybeSingle();
+  const path = profile?.brand_logo_path as string | null;
+  if (!path) return { ok: true };
+
+  await supabase.storage.from("brand-logos").remove([path]);
+  await supabase
+    .from("profiles")
+    .update({ brand_logo_path: null })
+    .eq("id", user.id);
+
+  revalidatePath("/", "layout");
+  revalidatePath("/preferencias");
   return { ok: true };
 }
 
