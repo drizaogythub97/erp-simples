@@ -86,6 +86,7 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 
 - 👤 Importar o repositório na Vercel e colar as variáveis de ambiente no painel.
 - 🤖 Ajustar `redirect URLs` no Supabase para o domínio da Vercel; validar build de produção.
+- 👤 **Pendência adiada do desenvolvimento:** reativar **"Confirm email"** no Supabase e configurar **SMTP externo** (ex.: Brevo/Resend) + personalizar os **templates de e-mail** (confirmação, recuperação de senha). Durante o dev usamos os templates padrão e o e-mail de confirmação ficou desativado.
 - **Entregável:** sistema no ar com URL pública (deploy automático a cada push).
 
 ## FASE 7 — Segurança aprofundada 🤖 ⏱️ ~1h
@@ -122,3 +123,11 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 - Manter o app sem dependências exclusivas da Vercel (evitar APIs proprietárias de runtime).
 - Usar variáveis de ambiente padrão e `@supabase/ssr` (portável).
 - Documentar no README o passo de migração. Detalhes na nota do [README](../README.md) e no guia de deploy.
+
+## Pendências pré-deploy (evolução futura)
+
+Itens conscientemente adiados. Fazer **na véspera do deploy de produção**, não antes.
+
+- **Templates de e-mail em pt-BR com identidade ERP Simples.** HTMLs já redigidos (entrega de 2026-06-19) usando `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=...&next=...`. Colar no painel Supabase → Authentication → Email Templates nas abas "Confirm signup", "Magic Link" e "Reset Password". Hoje o app funciona com os templates padrão do Supabase (em inglês) porque o `/auth/callback` aceita tanto `?code=` (PKCE) quanto `?token_hash=&type=` (OTP).
+- **SMTP próprio** (Resend, SendGrid, Mailgun ou similar) para customizar o "From name" e melhorar entregabilidade. Sem SMTP próprio, e-mails saem de `noreply@mail.app.supabase.io` e caem em spam com frequência. Configurar em Supabase → Authentication → SMTP Settings.
+- **Site URL e Redirect URLs de produção** no painel Supabase: hoje aponta para `http://localhost:3000`; trocar para a URL da Vercel/Cloudflare e adicionar o `/auth/callback` correspondente.
