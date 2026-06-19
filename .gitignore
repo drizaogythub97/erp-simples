@@ -44,3 +44,6 @@ yarn-error.log*
 
 # Claude Code (estado local por usuário)
 .claude/settings.local.json
+
+# Screenshots / artefatos locais de conferência
+prints/
