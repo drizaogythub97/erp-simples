@@ -3,6 +3,28 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { publicEnv } from "@/lib/env";
 
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  "/recover",
+  "/privacidade",
+  "/auth",
+];
+
+const AUTH_ONLY_PREFIXES = ["/login", "/signup"];
+
+function isPublic(pathname: string) {
+  return PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+function isAuthOnly(pathname: string) {
+  return AUTH_ONLY_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -29,7 +51,26 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANTE: usar getUser() (valida o token via servidor).
   // Nunca confiar em getSession() no servidor.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname, search } = request.nextUrl;
+
+  if (!user && !isPublic(pathname) && pathname !== "/") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    loginUrl.searchParams.set("next", pathname + search);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (user && isAuthOnly(pathname)) {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/dashboard";
+    dashboardUrl.search = "";
+    return NextResponse.redirect(dashboardUrl);
+  }
 
   return response;
 }
