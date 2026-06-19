@@ -7,6 +7,7 @@ import {
 } from "@/lib/dashboard/dates";
 import { formatBRL } from "@/lib/products/format";
 import { PAYMENT_METHOD_LABELS, type SaleRow } from "@/lib/types/sales";
+import type { PaymentMethod } from "@/app/(app)/caixa/actions";
 
 import { toggleSaleStatus } from "./actions";
 import { FinancialClient } from "./financial-client";
@@ -23,8 +24,25 @@ const VALID_PERIODS: ReadonlySet<Period> = new Set([
   "custom",
 ]);
 
+const ALL_METHODS: PaymentMethod[] = [
+  "dinheiro",
+  "pix",
+  "debito",
+  "credito_avista",
+  "credito_parcelado",
+  "vale",
+];
+
 function pickString(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function parseMethods(value: string | string[] | undefined): PaymentMethod[] {
+  const raw = Array.isArray(value) ? value : value ? value.split(",") : [];
+  const valid = raw.filter((m): m is PaymentMethod =>
+    ALL_METHODS.includes(m as PaymentMethod),
+  );
+  return Array.from(new Set(valid));
 }
 
 export default async function FinancialPage({
@@ -40,25 +58,30 @@ export default async function FinancialPage({
       : "today";
   const fromParam = pickString(params.from);
   const toParam = pickString(params.to);
+  const methods = parseMethods(params.methods);
 
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("sales")
     .select(
-      "id, total, status, payment_method, created_at, sale_items(id, product_id, name_snapshot, unit_price, quantity, line_total)",
+      "id, total, status, payment_method, installments, fee_amount, created_at, sale_items(id, product_id, name_snapshot, unit_price, quantity, line_total)",
     )
     .gte("created_at", from)
-    .lte("created_at", to)
-    .order("created_at", { ascending: false });
+    .lte("created_at", to);
+  if (methods.length > 0) {
+    query = query.in("payment_method", methods);
+  }
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   const sales = (data ?? []) as SaleRow[];
 
-  const completedRevenue = sales
-    .filter((s) => s.status === "completed")
-    .reduce((sum, s) => sum + Number(s.total), 0);
-  const completedCount = sales.filter((s) => s.status === "completed").length;
+  const completed = sales.filter((s) => s.status === "completed");
+  const grossRevenue = completed.reduce((sum, s) => sum + Number(s.total), 0);
+  const feesTotal = completed.reduce((sum, s) => sum + Number(s.fee_amount), 0);
+  const netRevenue = Math.round((grossRevenue - feesTotal) * 100) / 100;
+  const completedCount = completed.length;
   const voidedCount = sales.filter((s) => s.status === "voided").length;
 
   return (
@@ -75,18 +98,36 @@ export default async function FinancialPage({
         period={period}
         from={toDateInputValue(from)}
         to={toDateInputValue(to)}
+        selectedMethods={methods}
       />
 
-      <section className="bg-primary text-primary-foreground flex flex-col gap-2 rounded-xl p-5">
+      <section className="bg-primary text-primary-foreground flex flex-col gap-3 rounded-xl p-5">
         <p className="text-base opacity-90">
           Faturamento — {PERIOD_LABELS[period]}
         </p>
-        <p
-          className="text-4xl font-bold tabular-nums sm:text-5xl"
-          aria-live="polite"
-        >
-          {formatBRL(completedRevenue)}
-        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-sm opacity-80">Bruto</p>
+            <p
+              className="text-3xl font-bold tabular-nums sm:text-4xl"
+              aria-live="polite"
+            >
+              {formatBRL(grossRevenue)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm opacity-80">Taxas</p>
+            <p className="text-3xl font-bold tabular-nums sm:text-4xl">
+              − {formatBRL(feesTotal)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm opacity-80">Líquido</p>
+            <p className="text-3xl font-bold tabular-nums sm:text-4xl">
+              {formatBRL(netRevenue)}
+            </p>
+          </div>
+        </div>
         <p className="text-base opacity-90">
           {completedCount}{" "}
           {completedCount === 1 ? "venda registrada" : "vendas registradas"}
@@ -129,6 +170,8 @@ function SaleCard({ sale }: { sale: SaleRow }) {
   const voided = sale.status === "voided";
   const itemsLabel =
     sale.sale_items.length === 1 ? "1 item" : `${sale.sale_items.length} itens`;
+  const net = Math.round((Number(sale.total) - Number(sale.fee_amount)) * 100) /
+    100;
   return (
     <li
       className={
@@ -144,7 +187,10 @@ function SaleCard({ sale }: { sale: SaleRow }) {
               {formatBRL(sale.total)}
             </span>
             <StatusBadge voided={voided} />
-            <PaymentBadge method={sale.payment_method} />
+            <PaymentBadge
+              method={sale.payment_method}
+              installments={sale.installments}
+            />
           </div>
           <p className="text-muted-foreground text-sm">
             {new Intl.DateTimeFormat("pt-BR", {
@@ -156,6 +202,18 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             }).format(new Date(sale.created_at))}{" "}
             · {itemsLabel}
           </p>
+          {Number(sale.fee_amount) > 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Taxa{" "}
+              <span className="text-foreground font-medium">
+                {formatBRL(Number(sale.fee_amount))}
+              </span>{" "}
+              · Líquido{" "}
+              <span className="text-foreground font-medium">
+                {formatBRL(net)}
+              </span>
+            </p>
+          ) : null}
           <details className="text-base">
             <summary className="text-primary cursor-pointer text-base font-medium underline-offset-4 hover:underline">
               Ver itens
@@ -214,10 +272,20 @@ function StatusBadge({ voided }: { voided: boolean }) {
   );
 }
 
-function PaymentBadge({ method }: { method: SaleRow["payment_method"] }) {
+function PaymentBadge({
+  method,
+  installments,
+}: {
+  method: SaleRow["payment_method"];
+  installments: number | null;
+}) {
+  const label =
+    method === "credito_parcelado" && installments
+      ? `Crédito ${installments}x`
+      : PAYMENT_METHOD_LABELS[method];
   return (
     <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
-      {PAYMENT_METHOD_LABELS[method]}
+      {label}
     </span>
   );
 }
