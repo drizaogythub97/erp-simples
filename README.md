@@ -24,15 +24,15 @@ ERP web simples e multiusuário, construído como peça de portfólio com padrõ
 
 ## Stack
 
-| Camada | Tecnologia | Por quê |
-|---|---|---|
-| Front-end | Next.js (App Router) + React + TypeScript | Padrão de mercado, ótimo para portfólio, renderização no servidor |
-| Estilo / UI | Tailwind CSS + shadcn/ui | Componentes acessíveis prontos, design responsivo rápido |
-| Back-end / DB | Supabase (PostgreSQL) | Banco relacional gerenciado, ideal para vendas e relatórios |
-| Autenticação | Supabase Auth (email + senha) | Login robusto pronto, com recuperação de senha |
-| Isolamento de dados | PostgreSQL Row Level Security | Isolamento por usuário no nível do banco (defense-in-depth) |
-| Hospedagem | Vercel (preparado para Cloudflare Pages) | Deploy automático via GitHub; migração futura facilitada |
-| Testes | Vitest + Playwright | Unidade/integração e ponta-a-ponta |
+| Camada              | Tecnologia                                | Por quê                                                           |
+| ------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| Front-end           | Next.js (App Router) + React + TypeScript | Padrão de mercado, ótimo para portfólio, renderização no servidor |
+| Estilo / UI         | Tailwind CSS + shadcn/ui                  | Componentes acessíveis prontos, design responsivo rápido          |
+| Back-end / DB       | Supabase (PostgreSQL)                     | Banco relacional gerenciado, ideal para vendas e relatórios       |
+| Autenticação        | Supabase Auth (email + senha)             | Login robusto pronto, com recuperação de senha                    |
+| Isolamento de dados | PostgreSQL Row Level Security             | Isolamento por usuário no nível do banco (defense-in-depth)       |
+| Hospedagem          | Vercel (preparado para Cloudflare Pages)  | Deploy automático via GitHub; migração futura facilitada          |
+| Testes              | Vitest + Playwright                       | Unidade/integração e ponta-a-ponta                                |
 
 Custo total: **R$ 0** (todos os serviços em plano gratuito).
 

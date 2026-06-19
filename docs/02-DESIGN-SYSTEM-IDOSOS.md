@@ -20,18 +20,18 @@ A literatura de design para idosos converge em alguns pontos:
 
 Cores sóbrias, com alto contraste e significado claro. Verde como cor primária transmite confiança/finanças positivas e tem boa legibilidade.
 
-| Token | Hex | Uso |
-|---|---|---|
-| `primary` | `#1B7A43` (verde) | Ações principais, cabeçalho |
-| `primary-hover` | `#155F34` | Estado de toque/hover |
-| `text` | `#1A1A1A` | Texto principal (contraste ~16:1 no branco) |
-| `text-muted` | `#4B5563` | Texto secundário (ainda AA) |
-| `background` | `#FFFFFF` | Fundo principal |
-| `surface` | `#F4F6F5` | Cartões/seções |
-| `border` | `#D1D5DB` | Bordas/divisores |
-| `success` | `#15803D` | Confirmações |
-| `danger` | `#B91C1C` | Erros/exclusão |
-| `warning` | `#B45309` | Alertas (ex.: estoque baixo) |
+| Token           | Hex               | Uso                                         |
+| --------------- | ----------------- | ------------------------------------------- |
+| `primary`       | `#1B7A43` (verde) | Ações principais, cabeçalho                 |
+| `primary-hover` | `#155F34`         | Estado de toque/hover                       |
+| `text`          | `#1A1A1A`         | Texto principal (contraste ~16:1 no branco) |
+| `text-muted`    | `#4B5563`         | Texto secundário (ainda AA)                 |
+| `background`    | `#FFFFFF`         | Fundo principal                             |
+| `surface`       | `#F4F6F5`         | Cartões/seções                              |
+| `border`        | `#D1D5DB`         | Bordas/divisores                            |
+| `success`       | `#15803D`         | Confirmações                                |
+| `danger`        | `#B91C1C`         | Erros/exclusão                              |
+| `warning`       | `#B45309`         | Alertas (ex.: estoque baixo)                |
 
 > Cada par texto/fundo deve ser validado para contraste ≥ 4.5:1. Evitar transmitir informação **apenas** por cor (usar ícone + texto também).
 
@@ -92,7 +92,7 @@ Cores sóbrias, com alto contraste e significado claro. Verde como cor primária
 - **Quantidade por botões + e −** além de digitação — reduz erro de digitação em quem tem dificuldade motora.
 - **Cálculo automático** sempre; o usuário nunca faz conta de cabeça.
 - **Confirmação antes de gravar**, e venda recém-registrada pode ser **estornada/excluída** no dashboard financeiro (ação reversível).
-- Performance: busca de produtos no servidor com índice por nome; resultados limitados e com *debounce* para não pesar no celular.
+- Performance: busca de produtos no servidor com índice por nome; resultados limitados e com _debounce_ para não pesar no celular.
 
 ## Acessibilidade — checklist de implementação
 
