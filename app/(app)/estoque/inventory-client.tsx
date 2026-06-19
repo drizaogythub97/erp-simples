@@ -1,16 +1,25 @@
 "use client";
 
-import { Box, Pencil, UtensilsCrossed } from "lucide-react";
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import {
+  Box,
+  Check,
+  Minus,
+  PackagePlus,
+  Pencil,
+  Plus,
+  X,
+} from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LOW_STOCK_THRESHOLD } from "@/lib/dashboard/dates";
-import { formatBRL, formatQuantity } from "@/lib/products/format";
+import { formatBRL, formatQuantity, parseDecimalPtBR } from "@/lib/products/format";
 import type { Product } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
+
+import { updateStock } from "./actions";
 
 type Props = { products: Product[] };
 
@@ -34,16 +43,10 @@ export function InventoryClient({ products }: Props) {
       const created = new Date(p.created_at).getTime();
       if (fromDate && created < fromDate.getTime()) return false;
       if (toDate && created > toDate.getTime()) return false;
-      if (minN !== null && Number.isFinite(minN)) {
-        if (!p.track_stock || (p.stock_quantity ?? 0) < minN) return false;
-      }
-      if (maxN !== null && Number.isFinite(maxN)) {
-        if (!p.track_stock || (p.stock_quantity ?? 0) > maxN) return false;
-      }
-      if (onlyLow) {
-        if (!p.track_stock) return false;
-        if ((p.stock_quantity ?? 0) > LOW_STOCK_THRESHOLD) return false;
-      }
+      const qty = p.stock_quantity ?? 0;
+      if (minN !== null && Number.isFinite(minN) && qty < minN) return false;
+      if (maxN !== null && Number.isFinite(maxN) && qty > maxN) return false;
+      if (onlyLow && qty > LOW_STOCK_THRESHOLD) return false;
       return true;
     });
   }, [products, name, from, to, minQty, maxQty, onlyLow]);
@@ -158,138 +161,235 @@ export function InventoryClient({ products }: Props) {
         ) : null}
       </fieldset>
 
-      <p
-        className="text-muted-foreground text-base"
-        aria-live="polite"
-      >
+      <p className="text-muted-foreground text-base" aria-live="polite">
         {filtered.length} de {products.length}{" "}
         {products.length === 1 ? "produto" : "produtos"}.
       </p>
 
-      <ProductsTable products={filtered} />
+      {filtered.length === 0 ? (
+        <div className="bg-muted/40 rounded-xl p-8 text-center">
+          <p className="text-base">Nenhum produto bateu com os filtros.</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {filtered.map((p) => (
+            <StockRow key={p.id} product={p} />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function ProductsTable({ products }: { products: Product[] }) {
-  if (products.length === 0) {
-    return (
-      <div className="bg-muted/40 rounded-xl p-8 text-center">
-        <p className="text-base">Nenhum produto bateu com os filtros.</p>
-      </div>
-    );
-  }
+type Mode = null | "set" | "add";
 
-  return (
-    <>
-      <ul className="flex flex-col gap-3 md:hidden">
-        {products.map((p) => (
-          <li
-            key={p.id}
-            className="ring-foreground/10 bg-card flex flex-col gap-2 rounded-xl p-4 ring-1"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-foreground text-lg font-semibold">
-                {p.name}
-              </span>
-              <StockChip product={p} />
-            </div>
-            <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-base">
-              <span className="text-foreground font-medium">
-                {formatBRL(p.price)}
-              </span>
-              {p.barcode ? (
-                <span className="font-mono">{p.barcode}</span>
-              ) : null}
-            </div>
-            <Link
-              href={`/produtos/${p.id}/editar`}
-              className={cn(
-                buttonVariants({ variant: "outline" }),
-                "mt-2 h-11 text-base",
-              )}
-            >
-              <Pencil aria-hidden="true" className="size-4" />
-              Editar
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <div className="ring-foreground/10 hidden overflow-hidden rounded-xl ring-1 md:block">
-        <table className="w-full border-collapse text-base">
-          <thead className="bg-muted/60">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold">Produto</th>
-              <th className="px-4 py-3 text-left font-semibold">Código</th>
-              <th className="px-4 py-3 text-right font-semibold">Preço</th>
-              <th className="px-4 py-3 text-left font-semibold">Estoque</th>
-              <th className="px-4 py-3 text-right font-semibold">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p, i) => (
-              <tr
-                key={p.id}
-                className={cn(
-                  "border-border border-t",
-                  i % 2 === 1 ? "bg-muted/20" : undefined,
-                )}
-              >
-                <td className="px-4 py-3 font-medium">{p.name}</td>
-                <td className="text-muted-foreground px-4 py-3 font-mono">
-                  {p.barcode ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums">
-                  {formatBRL(p.price)}
-                </td>
-                <td className="px-4 py-3">
-                  <StockChip product={p} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`/produtos/${p.id}/editar`}
-                    className={cn(
-                      buttonVariants({ variant: "outline" }),
-                      "h-10 px-3 text-sm",
-                    )}
-                    aria-label={`Editar ${p.name}`}
-                  >
-                    <Pencil aria-hidden="true" className="size-4" />
-                    Editar
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-function StockChip({ product }: { product: Product }) {
-  if (!product.track_stock) {
-    return (
-      <span
-        className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800"
-        aria-label="Produto sob demanda"
-      >
-        <UtensilsCrossed aria-hidden="true" className="size-4" />
-        Sob demanda
-      </span>
-    );
-  }
+function StockRow({ product }: { product: Product }) {
+  const [mode, setMode] = useState<Mode>(null);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   const qty = product.stock_quantity ?? 0;
   const low = qty <= LOW_STOCK_THRESHOLD;
+
+  function openMode(next: "set" | "add") {
+    setMode(next);
+    setValue(next === "set" ? formatQuantity(qty).replace(/\./g, "") : "");
+    setError(null);
+    setFeedback(null);
+  }
+
+  function cancel() {
+    setMode(null);
+    setValue("");
+    setError(null);
+  }
+
+  function submit() {
+    const parsed = parseDecimalPtBR(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError("Quantidade inválida.");
+      return;
+    }
+    if (mode === "add" && parsed === 0) {
+      setError("Informe quanto chegou.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.set("id", product.id);
+    fd.set("mode", mode!);
+    fd.set("quantity", String(parsed));
+
+    startTransition(async () => {
+      const result = await updateStock(fd);
+      if (result.ok) {
+        setMode(null);
+        setValue("");
+        setError(null);
+        setFeedback(
+          mode === "add"
+            ? `Entrada de ${formatQuantity(parsed)} registrada.`
+            : `Estoque atualizado para ${formatQuantity(parsed)}.`,
+        );
+      } else {
+        setError(result.error ?? "Erro ao salvar.");
+      }
+    });
+  }
+
+  return (
+    <li
+      className={cn(
+        "ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-4 ring-1",
+        low ? "ring-warning/30 bg-warning/5" : undefined,
+      )}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-foreground text-lg font-semibold">
+              {product.name}
+            </span>
+            <StockChip qty={qty} low={low} />
+          </div>
+          <div className="text-muted-foreground text-base">
+            {formatBRL(product.price)}
+          </div>
+        </div>
+        {mode === null ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => openMode("set")}
+              className="h-12 px-4 text-base"
+            >
+              <Pencil aria-hidden="true" className="size-4" />
+              Atualizar quantidade
+            </Button>
+            <Button
+              type="button"
+              onClick={() => openMode("add")}
+              className="h-12 px-4 text-base"
+            >
+              <PackagePlus aria-hidden="true" className="size-4" />
+              Receber entrada
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {mode !== null ? (
+        <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-base font-medium">
+              {mode === "set" ? "Definir total para:" : "Receber entrada de:"}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setValue((v) => {
+                    const n = parseDecimalPtBR(v);
+                    return Number.isFinite(n) && n > 0
+                      ? String(Math.max(0, n - 1))
+                      : "0";
+                  })
+                }
+                aria-label="Diminuir 1"
+                className="h-12 w-12 p-0"
+              >
+                <Minus aria-hidden="true" className="size-5" />
+              </Button>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  setError(null);
+                }}
+                aria-label="Quantidade"
+                className="h-12 w-24 text-center text-lg"
+                autoFocus
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setValue((v) => {
+                    const n = parseDecimalPtBR(v);
+                    return String((Number.isFinite(n) ? n : 0) + 1);
+                  })
+                }
+                aria-label="Aumentar 1"
+                className="h-12 w-12 p-0"
+              >
+                <Plus aria-hidden="true" className="size-5" />
+              </Button>
+            </div>
+            {mode === "add" ? (
+              <span className="text-muted-foreground text-sm">
+                Total ficará{" "}
+                <strong className="text-foreground font-medium">
+                  {formatQuantity(
+                    qty + (Number.isFinite(parseDecimalPtBR(value))
+                      ? parseDecimalPtBR(value)
+                      : 0),
+                  )}
+                </strong>
+                .
+              </span>
+            ) : null}
+          </div>
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cancel}
+              disabled={pending}
+              className="h-12 px-5 text-base"
+            >
+              <X aria-hidden="true" className="size-4" />
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={submit}
+              disabled={pending}
+              aria-busy={pending}
+              className="h-12 px-5 text-base"
+            >
+              <Check aria-hidden="true" className="size-4" />
+              {pending ? "Salvando…" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {feedback ? (
+        <p className="text-success text-sm" role="status" aria-live="polite">
+          {feedback}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+function StockChip({ qty, low }: { qty: number; low: boolean }) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium",
-        low
-          ? "bg-warning/15 text-warning"
-          : "bg-primary/10 text-primary",
+        low ? "bg-warning/15 text-warning" : "bg-primary/10 text-primary",
       )}
       aria-label={`Estoque ${formatQuantity(qty)}${low ? ", baixo" : ""}`}
     >

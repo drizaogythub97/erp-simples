@@ -14,6 +14,7 @@ export default async function InventoryPage() {
     .select(
       "id, user_id, name, barcode, price, track_stock, stock_quantity, created_at, updated_at",
     )
+    .eq("track_stock", true)
     .order("name", { ascending: true });
 
   const products = (data ?? []) as Product[];
@@ -23,8 +24,9 @@ export default async function InventoryPage() {
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Estoque</h1>
         <p className="text-muted-foreground mt-2 text-lg">
-          Filtre por nome, data de inclusão ou quantidade. A lista atualiza
-          enquanto você digita.
+          Atualize quantidades e registre entradas dos produtos que você
+          controla por estoque. Itens sob demanda ficam em{" "}
+          <span className="text-foreground font-medium">Produtos</span>.
         </p>
       </header>
       <InventoryClient products={products} />
