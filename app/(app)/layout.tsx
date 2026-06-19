@@ -1,11 +1,10 @@
-import { Settings } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppNav } from "@/components/app/app-nav";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { LogoutButton } from "@/components/app/logout-button";
+import { SettingsMenu } from "@/components/app/settings-menu";
 import { createClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
 
 export default async function AppLayout({
   children,
@@ -62,25 +61,8 @@ export default async function AppLayout({
             >
               {displayName}
             </span>
-            <Link
-              href="/preferencias"
-              aria-label="Preferências"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "icon" }),
-                "size-12",
-              )}
-            >
-              <Settings aria-hidden="true" className="size-5" />
-            </Link>
-            <form action="/auth/sign-out" method="post">
-              <Button
-                type="submit"
-                variant="outline"
-                className="h-12 px-5 text-base"
-              >
-                Sair
-              </Button>
-            </form>
+            <SettingsMenu />
+            <LogoutButton />
           </div>
         </div>
         <AppNav />
