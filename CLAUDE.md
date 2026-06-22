@@ -66,6 +66,20 @@ tests/              # vitest + playwright
 3. Na fase de segurança, rodar `/security-review` e corrigir achados.
 4. Não inventar requisitos fora do escopo do MVP (ver `docs/00-VISAO-GERAL.md`).
 
+## Sistema em produção — política de branch (desde 2026-06-21)
+
+O sistema **está no ar** em `https://erp-simples.vercel.app` (Vercel, deploy
+automático a cada push na `main`). Por isso:
+
+- **A `main` é produção.** Toda melhoria ou nova implementação é desenvolvida
+  **em uma branch**, nunca commitando direto na `main`.
+- Cada push de branch gera um **Preview Deployment** na Vercel (URL própria)
+  para validar antes de promover.
+- Só após aprovação do usuário a branch é mesclada na `main` (→ deploy de
+  produção automático).
+- Exceção: alterações de documentação/handoff podem ir direto à `main` quando
+  o usuário pedir explicitamente.
+
 ## Referências de documentação interna
 
 - Visão e escopo: `docs/00-VISAO-GERAL.md`
